@@ -45,13 +45,16 @@ tests/               pytest suite
 
 ## Roadmap
 
-| Phase | Weeks | Deliverable |
-| ----- | ----- | ----------- |
-| 1 | 1–2 | Skeleton + libclang parser + Monaco UI |
-| 2 | 3–5 | CFG + reaching-defs + Cytoscape viewer |
-| 3 | 5–7 | 7 UB detectors |
-| 4 | 7–8 | Groq LLM explanation layer |
-| 5 | 8–9 | Diagnostics UX polish |
-| 6 | 10–12 | Juliet evaluation + report |
+| Phase | Weeks | Deliverable | Status |
+| ----- | ----- | ----------- | ------ |
+| 1 | 1–2 | Skeleton + libclang parser + Monaco UI | ✅ |
+| 2 | 3–5 | CFG + reaching-defs + Cytoscape viewer | ✅ |
+| 3 | 5–7 | 7 UB detectors | 🔜 next |
+| 4 | 7–8 | Groq LLM explanation layer | — |
+| 5 | 8–9 | Diagnostics UX polish | — |
+| 6 | 10–12 | Juliet evaluation + report | — |
 
-See [the plan file](../Users/Lenovo/.claude/plans/for-a-2-person-compiler-design-unified-pearl.md) for full detail.
+Detailed plans:
+- [docs/roadmap.md](docs/roadmap.md) — overview of Phases 3–6
+- [docs/phase3-detectors.md](docs/phase3-detectors.md) — per-detector spec
+  (AST patterns, algorithms, test snippets) for the next phase
