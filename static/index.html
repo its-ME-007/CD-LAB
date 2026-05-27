@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CD_LAB — UB Detector</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand">
+            <span class="brand-mark">{ }</span>
+            <div>
+                <h1>CD_LAB</h1>
+                <p class="tagline">AI-Assisted UB Detection in C/C++</p>
+            </div>
+        </div>
+        <div class="status">
+            <span id="health-dot" class="dot dot-unknown"></span>
+            <span id="health-text">checking libclang...</span>
+        </div>
+    </header>
+
+    <main class="layout">
+        <section class="editor-pane">
+            <div class="pane-header">
+                <div class="pane-title">
+                    <h2>Source</h2>
+                    <select id="language">
+                        <option value="cpp" selected>C++</option>
+                        <option value="c">C</option>
+                    </select>
+                </div>
+                <div class="pane-actions">
+                    <button id="analyze-btn" class="btn primary">Analyze</button>
+                </div>
+            </div>
+            <div id="editor"></div>
+        </section>
+
+        <section class="output-pane">
+            <div class="pane-header">
+                <h2>Output</h2>
+                <span id="elapsed" class="muted"></span>
+            </div>
+            <div class="tabs">
+                <button class="tab active" data-tab="diagnostics">Diagnostics</button>
+                <button class="tab" data-tab="cfg">CFG</button>
+                <button class="tab" data-tab="ast">AST</button>
+                <button class="tab" data-tab="errors">Parse errors</button>
+            </div>
+            <div class="tab-body">
+                <div id="tab-diagnostics" class="tab-panel active">
+                    <p class="muted">Phase 1–2: detectors not wired yet. Run Analyze to see AST, parse errors, and the CFG.</p>
+                    <ul id="diagnostics-list"></ul>
+                </div>
+                <div id="tab-cfg" class="tab-panel cfg-panel">
+                    <div class="cfg-toolbar">
+                        <label class="muted" for="cfg-function">Function:</label>
+                        <select id="cfg-function"></select>
+                        <button id="cfg-fit" class="btn">Fit</button>
+                    </div>
+                    <div id="cfg-canvas"></div>
+                </div>
+                <div id="tab-ast" class="tab-panel">
+                    <pre id="ast-json" class="codeblock"></pre>
+                </div>
+                <div id="tab-errors" class="tab-panel">
+                    <ul id="errors-list"></ul>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
+    <script src="/static/cfg.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>
