@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .analyzer import libclang_status
 from .routes import analyze as analyze_route
+from .routes import explain as explain_route
 from .routes import graph as graph_route
 from .schemas import HealthResponse
 
@@ -41,6 +42,8 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.include_router(analyze_route.router)
 app.include_router(graph_route.router)
+app.include_router(explain_route.router)
+
 
 
 @app.get("/")

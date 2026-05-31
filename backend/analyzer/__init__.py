@@ -10,6 +10,7 @@ from .dataflow import (
     reaching_definitions,
 )
 from .parser import libclang_status, parse_source
+from .detectors import run_all
 
 __all__ = [
     "BasicBlock",
@@ -23,4 +24,6 @@ __all__ = [
     "live_variables",
     "parse_source",
     "reaching_definitions",
+    "run_all",
 ]
+

@@ -46,6 +46,37 @@ function initTabs() {
     });
 }
 
+async function loadSamples() {
+    try {
+        const res = await fetch('/api/samples');
+        if (!res.ok) return;
+        const samples = await res.json();
+        const sel = document.getElementById('samples-select');
+        if (!sel) return;
+        
+        sel.innerHTML = '<option value="">-- Load Sample --</option>';
+        samples.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.name;
+            opt.textContent = s.name;
+            sel.appendChild(opt);
+        });
+        
+        sel.onchange = () => {
+            const chosen = samples.find(s => s.name === sel.value);
+            if (chosen && editor) {
+                editor.setValue(chosen.content);
+                const isC = chosen.name.endsWith('.c');
+                document.getElementById('language').value = isC ? 'c' : 'cpp';
+                monaco.editor.setModelLanguage(editor.getModel(), isC ? 'c' : 'cpp');
+                analyze();
+            }
+        };
+    } catch (e) {
+        console.error('Failed to load samples:', e);
+    }
+}
+
 function initMonaco() {
     require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
     require(['vs/editor/editor.main'], () => {
@@ -68,20 +99,142 @@ function initMonaco() {
         document.getElementById('language').addEventListener('change', e => {
             monaco.editor.setModelLanguage(editor.getModel(), e.target.value === 'c' ? 'c' : 'cpp');
         });
+        loadSamples();
     });
+}
+
+function escapeHtml(text) {
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 function renderDiagnostics(diagnostics) {
     const ul = document.getElementById('diagnostics-list');
     ul.innerHTML = '';
+    
+    if (window.monaco && editor) {
+        const markers = diagnostics.map(d => {
+            let severity = monaco.MarkerSeverity.Info;
+            if (d.severity === 'error') severity = monaco.MarkerSeverity.Error;
+            else if (d.severity === 'warning') severity = monaco.MarkerSeverity.Warning;
+            
+            return {
+                startLineNumber: d.range.line,
+                startColumn: d.range.column,
+                endLineNumber: d.range.end_line,
+                endColumn: d.range.end_column,
+                message: d.message,
+                severity: severity
+            };
+        });
+        monaco.editor.setModelMarkers(editor.getModel(), 'owner', markers);
+    }
+    
     if (!diagnostics.length) {
-        ul.innerHTML = '<li class="muted">No diagnostics. (Detectors land in Phase 3.)</li>';
+        ul.innerHTML = '<li class="muted">No diagnostics. Code is healthy!</li>';
         return;
     }
+    
     for (const d of diagnostics) {
         const li = document.createElement('li');
-        li.className = `diag-${d.severity}`;
-        li.innerHTML = `<strong>[${d.category}]</strong> line ${d.range.line}: ${d.message}`;
+        li.className = `diag-item diag-${d.severity}`;
+        li.innerHTML = `
+            <div class="diag-header">
+                <span class="diag-badge badge-${d.severity}">${d.severity}</span>
+                <span class="category-badge">${d.category}</span>
+                <span class="muted font-mono">Line ${d.range.line}</span>
+            </div>
+            <div class="diag-message">${d.message}</div>
+            <div class="explain-container" id="explain-${d.id}">
+                <button class="btn btn-sm btn-explain" id="btn-${d.id}">Explain & Suggest Fix</button>
+            </div>
+        `;
+        
+        const focusHandler = () => {
+            if (editor) {
+                editor.revealLineInCenter(d.range.line);
+                editor.setSelection({
+                    startLineNumber: d.range.line,
+                    startColumn: d.range.column,
+                    endLineNumber: d.range.end_line,
+                    endColumn: d.range.end_column
+                });
+                editor.focus();
+            }
+            if (d.cfg_node_id && window.CFGView) {
+                const parts = d.cfg_node_id.split('#');
+                if (parts.length > 0) {
+                    const funcName = parts[0];
+                    window.CFGView.focusFunction(funcName);
+                    window.CFGView.highlightNode(d.cfg_node_id);
+                    document.querySelector('.tab[data-tab="cfg"]').click();
+                }
+            }
+        };
+        
+        li.querySelector('.diag-header').addEventListener('click', focusHandler);
+        li.querySelector('.diag-message').addEventListener('click', focusHandler);
+        
+        const btn = li.querySelector(`#btn-${d.id}`);
+        btn.addEventListener('click', async (evt) => {
+            evt.stopPropagation();
+            const explainDiv = li.querySelector(`#explain-${d.id}`);
+            explainDiv.innerHTML = `
+                <div class="llm-spinner">
+                    <div class="spinner-icon"></div>
+                    <span>Consulting LLM Expert...</span>
+                </div>
+            `;
+            
+            try {
+                const res = await fetch('/api/explain', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        diagnostic: d,
+                        code: editor.getValue(),
+                        context_lines: 3
+                    })
+                });
+                
+                if (!res.ok) {
+                    throw new Error(`HTTP error ${res.status}`);
+                }
+                
+                const data = await res.json();
+                if (data.ok) {
+                    explainDiv.innerHTML = `
+                        <div class="llm-explanation">
+                            <strong>AI Explanation:</strong>
+                            <p>${data.explanation}</p>
+                        </div>
+                        ${data.fix_suggestion ? `
+                        <div class="llm-fix">
+                            <strong>Suggested Fix:</strong>
+                            <pre class="codeblock fix-code">${escapeHtml(data.fix_suggestion)}</pre>
+                        </div>
+                        ` : ''}
+                    `;
+                } else {
+                    explainDiv.innerHTML = `
+                        <div class="llm-error">
+                            <p><strong>LLM Offline:</strong> ${data.error || 'Failed to generate explanation.'}</p>
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                explainDiv.innerHTML = `
+                    <div class="llm-error">
+                        <p><strong>Error:</strong> ${err.message}</p>
+                    </div>
+                `;
+            }
+        });
+        
         ul.appendChild(li);
     }
 }
@@ -99,6 +252,7 @@ function renderParseErrors(errors) {
         ul.appendChild(li);
     }
 }
+
 
 function renderAST(ast) {
     const pre = document.getElementById('ast-json');

@@ -53,6 +53,7 @@
             { selector: 'node[kind = "return"]',      style: { 'background-color': '#2a1f33', 'border-color': '#ff6b6b' } },
             { selector: 'node[kind = "break"]',       style: { 'background-color': '#33291f', 'border-color': '#f7c948' } },
             { selector: 'node[kind = "continue"]',    style: { 'background-color': '#1f3326', 'border-color': '#54d28a' } },
+            { selector: 'node.highlight',             style: { 'border-color': '#ff3b30', 'border-width': 3, 'background-color': '#4a1515' } },
             {
                 selector: 'edge',
                 style: {
@@ -165,7 +166,19 @@
         fit() {
             if (cy) cy.fit(undefined, 20);
         },
+        highlightNode(nodeId) {
+            if (!cy) return;
+            cy.nodes().removeClass('highlight');
+            if (nodeId) {
+                const node = cy.$id(nodeId);
+                if (node.length > 0) {
+                    node.addClass('highlight');
+                    cy.center(node);
+                }
+            }
+        }
     };
+
 
     document.addEventListener('DOMContentLoaded', () => {
         const btn = document.getElementById('cfg-fit');
