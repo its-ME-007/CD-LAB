@@ -16,6 +16,7 @@ int main(void) {
 `;
 
 let editor = null;
+let llvmEditor = null;
 
 function setHealth(ok, info) {
     const dot = document.getElementById('health-dot');
@@ -96,11 +97,61 @@ function initMonaco() {
                 editor.focus();
             },
         };
+        // Second Monaco instance for the LLVM IR viewer (read-only).
+        // Monaco doesn't ship an `llvm` grammar out of the box, so we use
+        // `plaintext` with monospaced styling — readable, no extra deps.
+        llvmEditor = monaco.editor.create(document.getElementById('llvm-editor'), {
+            value: '; LLVM IR will appear here after Analyze.\n',
+            language: 'plaintext',
+            theme: 'vs-dark',
+            readOnly: true,
+            automaticLayout: true,
+            fontSize: 12,
+            minimap: { enabled: false },
+            scrollBeyondLastLine: false,
+            wordWrap: 'off',
+        });
         document.getElementById('language').addEventListener('change', e => {
             monaco.editor.setModelLanguage(editor.getModel(), e.target.value === 'c' ? 'c' : 'cpp');
         });
         loadSamples();
     });
+}
+
+function renderLLVMIR(payload) {
+    const status = document.getElementById('llvm-status');
+    const container = document.getElementById('llvm-editor');
+    if (!payload) {
+        if (llvmEditor) llvmEditor.setValue('; (no IR returned)\n');
+        if (status) status.textContent = '';
+        return;
+    }
+    if (payload.ok && payload.ir) {
+        // Make sure the editor is visible (we may have replaced it with the
+        // error <div> on a previous failure — restore the canvas first).
+        if (!llvmEditor && window.monaco) {
+            container.innerHTML = '';
+            llvmEditor = monaco.editor.create(container, {
+                value: payload.ir,
+                language: 'plaintext',
+                theme: 'vs-dark',
+                readOnly: true,
+                automaticLayout: true,
+                fontSize: 12,
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                wordWrap: 'off',
+            });
+        } else {
+            llvmEditor.setValue(payload.ir);
+        }
+        const lineCount = payload.ir.split('\n').length;
+        if (status) status.textContent = `${lineCount} lines`;
+    } else {
+        if (llvmEditor) { llvmEditor.dispose(); llvmEditor = null; }
+        container.innerHTML = `<div class="llvm-error">${escapeHtml(payload.error || 'IR generation failed.')}</div>`;
+        if (status) status.textContent = 'unavailable';
+    }
 }
 
 function escapeHtml(text) {
@@ -287,6 +338,7 @@ async function analyze() {
         renderDiagnostics(data.diagnostics || []);
         renderParseErrors(data.parse_errors || []);
         renderAST(data.ast);
+        renderLLVMIR(data.llvm_ir);
         if (window.CFGView) {
             try {
                 window.CFGView.render(cfgData.cfgs || []);

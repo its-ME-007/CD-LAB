@@ -7,12 +7,13 @@ from fastapi import APIRouter, HTTPException
 
 from ..analyzer import (
     build_cfgs,
+    generate_llvm_ir,
     live_variables,
     parse_source,
     reaching_definitions,
     run_all,
 )
-from ..schemas import AnalyzeRequest, AnalyzeResponse
+from ..schemas import AnalyzeRequest, AnalyzeResponse, LLVMIR
 
 router = APIRouter(prefix="/api", tags=["analyze"])
 
@@ -25,7 +26,7 @@ def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
     t0 = time.perf_counter()
     try:
         result = parse_source(req.code, language=req.language, filename=req.filename)
-        
+
         src_filename = Path(result.source_path).name
         cfgs = build_cfgs(result.tu, src_filename=src_filename)
         rds = [reaching_definitions(c) for c in cfgs]
@@ -34,6 +35,12 @@ def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"parser/detector failure: {exc}") from exc
 
+    # LLVM IR is a "supporting compiler artifact" — never fatal to /analyze.
+    # If clang is missing or codegen fails (e.g. user pasted invalid source),
+    # we surface ok=False + a message in the IR tab and continue.
+    ir_result = generate_llvm_ir(req.code, language=req.language)
+    llvm_ir = LLVMIR(ok=ir_result.ok, ir=ir_result.ir, error=ir_result.error)
+
     elapsed_ms = (time.perf_counter() - t0) * 1000
 
     return AnalyzeResponse(
@@ -41,6 +48,7 @@ def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
         diagnostics=diagnostics,
         ast=result.ast,
         parse_errors=result.errors,
+        llvm_ir=llvm_ir,
         elapsed_ms=round(elapsed_ms, 2),
     )
 

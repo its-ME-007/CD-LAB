@@ -132,6 +132,41 @@ copied wholesale. We're swapping the prompt and dropping the agent loop.
 
 ---
 
+## Bonus — LLVM IR Viewer (added after Phase 5)
+
+**Status:** ✅ landed.
+
+**Scope (locked):**
+- `clang -S -emit-llvm -O0` runs alongside parser + CFG + detectors inside
+  `POST /api/analyze`.
+- A new **LLVM IR** tab in the UI shows the resulting `.ll` text in a
+  read-only Monaco editor (plaintext highlighting; the `llvm` Monarch
+  grammar isn't built in to Monaco).
+- IR generation is **non-fatal**: if `clang` is missing on PATH or the
+  user's code has a syntax error, the analyze response carries
+  `llvm_ir.ok = false` + a human-readable message, and the rest of the
+  pipeline still works.
+
+**Deliberately out of scope:**
+- Source ↔ IR line mapping (would need `-g` + `!dbg` parsing).
+- Diagnostic ↔ IR cross-link.
+- IR-based detectors / optimization comparisons.
+
+For the report: "LLVM IR is presented as a supporting compiler artifact
+alongside the AST and CFG views to illustrate the front-end → IR pipeline.
+We did not extend the detector layer to operate on IR — all UB checks run
+on libclang's AST + our own CFG/dataflow, which keeps the analysis
+language-aware (pointer types, member access, etc.)."
+
+**Files:** [backend/analyzer/llvm_ir.py](../backend/analyzer/llvm_ir.py),
+extension of [routes/analyze.py](../backend/routes/analyze.py), new tab in
+[static/index.html](../static/index.html), `llvmEditor` in
+[static/app.js](../static/app.js), tests in
+[tests/test_llvm_ir.py](../tests/test_llvm_ir.py) (auto-skip when clang is
+unavailable).
+
+---
+
 ## Phase 6 — Evaluation + Report (Weeks 10–12)
 
 **Goal:** prove the system works on real-world UB samples and write the report.

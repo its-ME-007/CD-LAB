@@ -51,6 +51,7 @@
                 <button class="tab active" data-tab="diagnostics">Diagnostics</button>
                 <button class="tab" data-tab="cfg">CFG</button>
                 <button class="tab" data-tab="ast">AST</button>
+                <button class="tab" data-tab="llvm">LLVM IR</button>
                 <button class="tab" data-tab="errors">Parse errors</button>
             </div>
             <div class="tab-body">
@@ -69,6 +70,13 @@
                 <div id="tab-ast" class="tab-panel">
                     <pre id="ast-json" class="codeblock"></pre>
                 </div>
+                <div id="tab-llvm" class="tab-panel llvm-panel">
+                    <div class="llvm-toolbar">
+                        <span class="muted">LLVM IR (read-only · -O0)</span>
+                        <span id="llvm-status" class="muted"></span>
+                    </div>
+                    <div id="llvm-editor"></div>
+                </div>
                 <div id="tab-errors" class="tab-panel">
                     <ul id="errors-list"></ul>
                 </div>
@@ -76,10 +84,16 @@
         </section>
     </main>
 
+    <!-- Cytoscape, dagre, cytoscape-dagre are UMD modules. They MUST load
+         before Monaco's AMD loader, otherwise they detect `define()` and try
+         to register as anonymous AMD modules — which collide and throw
+         "Can only have one anonymous define call per script file". Loading
+         them first means they attach to window.cytoscape / window.dagre /
+         window.cytoscapeDagre as globals. -->
+    <script src="/static/vendor/cytoscape.min.js"></script>
+    <script src="/static/vendor/dagre.min.js"></script>
+    <script src="/static/vendor/cytoscape-dagre.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
     <script src="/static/cfg.js"></script>
     <script src="/static/app.js"></script>
 </body>

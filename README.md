@@ -21,9 +21,19 @@ Open <http://localhost:8000/> and paste a C/C++ snippet.
 ## libclang on Windows
 
 The `libclang` PyPI package ships a bundled `libclang.dll`, so no system
-LLVM install is required for development. If you'd rather use a system
-install (e.g. via [LLVM releases](https://github.com/llvm/llvm-project/releases)),
+LLVM install is required for parsing. If you'd rather use a system install
+(e.g. via [LLVM releases](https://github.com/llvm/llvm-project/releases)),
 set `LIBCLANG_PATH` in `.env` to the absolute path of `libclang.dll`.
+
+## LLVM IR generation (optional)
+
+The "LLVM IR" tab shells out to the `clang` / `clang++` CLI to produce
+`-O0` IR alongside the AST and CFG views. Install
+[LLVM for Windows](https://github.com/llvm/llvm-project/releases) (Windows
+installer or scoop) and ensure `clang` is on PATH, or set `CLANG_PATH` in
+`.env` to a specific `clang.exe`. When clang is missing the rest of the
+analyze pipeline still works — the IR tab just shows a one-line message
+explaining how to enable it.
 
 ## Layout
 
@@ -51,8 +61,9 @@ tests/               pytest suite
 | 2 | 3–5 | CFG + reaching-defs + Cytoscape viewer | ✅ |
 | 3 | 5–7 | 7 UB detectors | 🔜 next |
 | 4 | 7–8 | Groq LLM explanation layer | — |
-| 5 | 8–9 | Diagnostics UX polish | — |
+| 5 | 8–9 | Diagnostics UX polish | ✅ |
 | 6 | 10–12 | Juliet evaluation + report | — |
+| + | — | LLVM IR viewer (read-only, -O0) | ✅ |
 
 Detailed plans:
 - [docs/roadmap.md](docs/roadmap.md) — overview of Phases 3–6

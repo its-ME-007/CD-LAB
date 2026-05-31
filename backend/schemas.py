@@ -59,11 +59,18 @@ class AnalyzeRequest(BaseModel):
     filename: str | None = None
 
 
+class LLVMIR(BaseModel):
+    ok: bool
+    ir: str | None = None
+    error: str | None = None
+
+
 class AnalyzeResponse(BaseModel):
     ok: bool
     diagnostics: list[Diagnostic] = Field(default_factory=list)
     ast: ASTNode | None = None
     parse_errors: list[str] = Field(default_factory=list)
+    llvm_ir: LLVMIR | None = None
     elapsed_ms: float = 0.0
 
 
