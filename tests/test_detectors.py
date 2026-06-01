@@ -158,6 +158,109 @@ def test_integer_overflow():
     assert "overflow" in overflow_diags[0].message.lower()
 
 
+# ---------------------------------------------------------------------------
+# C++-specific idioms: nullptr, new/delete, delete[], references.
+# These exercise the same detectors through C++-only syntax that the
+# C-centric tests above don't cover.
+# ---------------------------------------------------------------------------
+
+def test_cpp_nullptr_dereference():
+    # TP: pointer initialised to nullptr and dereferenced.
+    code = """
+    void test() {
+        int* p = nullptr;
+        *p = 5;
+    }
+    """
+    null_diags = [d for d in _diagnostics_for(code) if d.category == "null_deref"]
+    assert len(null_diags) >= 1
+    assert "null pointer" in null_diags[0].message.lower()
+
+    # TN: nullptr reassigned to a valid address before use.
+    code_ok = """
+    void test() {
+        int x = 42;
+        int* p = nullptr;
+        p = &x;
+        *p = 5;
+    }
+    """
+    assert [d for d in _diagnostics_for(code_ok) if d.category == "null_deref"] == []
+
+
+def test_cpp_nullptr_arrow_member_access():
+    # TP: nullptr struct pointer accessed via `->`.
+    code = """
+    struct Widget { int value; };
+    void test() {
+        Widget* w = nullptr;
+        w->value = 1;
+    }
+    """
+    null_diags = [d for d in _diagnostics_for(code) if d.category == "null_deref"]
+    assert len(null_diags) >= 1
+
+
+def test_cpp_new_delete_use_after_free():
+    # TP: new/delete then dereference.
+    code = """
+    void test() {
+        int* p = new int(7);
+        delete p;
+        *p = 10;
+    }
+    """
+    uaf_diags = [d for d in _diagnostics_for(code) if d.category == "use_after_free"]
+    assert len(uaf_diags) >= 1
+    assert "freed" in uaf_diags[0].message.lower()
+
+    # TN: new/delete with no access after delete.
+    code_ok = """
+    void test() {
+        int* p = new int(7);
+        *p = 10;
+        delete p;
+    }
+    """
+    assert [d for d in _diagnostics_for(code_ok) if d.category == "use_after_free"] == []
+
+
+def test_cpp_new_array_delete_use_after_free():
+    # TP: new[]/delete[] then index.
+    code = """
+    void test() {
+        int* a = new int[4];
+        delete[] a;
+        a[0] = 1;
+    }
+    """
+    uaf_diags = [d for d in _diagnostics_for(code) if d.category == "use_after_free"]
+    assert len(uaf_diags) >= 1
+
+
+def test_cpp_dangling_pointer_from_function():
+    # TP: returning address of a local from a non-main function.
+    code = """
+    int* makePtr() {
+        int local = 10;
+        return &local;
+    }
+    """
+    dangling_diags = [d for d in _diagnostics_for(code) if d.category == "dangling"]
+    assert len(dangling_diags) >= 1
+    assert "stack variable" in dangling_diags[0].message.lower()
+
+
+def test_cpp_out_of_bounds_and_div_zero():
+    # OOB on a C++ stack array.
+    oob = [d for d in _diagnostics_for("void f(){int a[3]; a[7]=1;}") if d.category == "oob"]
+    assert len(oob) >= 1
+
+    # Division by a variable that is provably zero.
+    div = [d for d in _diagnostics_for("int f(){int d=0; return 100/d;}") if d.category == "div_zero"]
+    assert len(div) >= 1
+
+
 def test_every_detector_populates_reasoning():
     """Every positive diagnostic from every detector must carry a non-empty
     `reasoning` list. The "AST Reasoning" UI block depends on this contract."""

@@ -41,6 +41,10 @@ class Diagnostic(BaseModel):
     fix_suggestion: str | None = None
     cfg_node_id: str | None = None
     llvm_evidence: list[str] | None = None
+    # 1-based line numbers into `LLVMIR.ir`, aligned 1:1 with `llvm_evidence`,
+    # so the UI can scroll the IR viewer to the instruction backing each
+    # evidence row (click-to-jump). None when no IR/evidence is available.
+    llvm_evidence_lines: list[int] | None = None
     # 2-3 plain-text bullets from the AST/CFG/dataflow detector describing
     # *why* this code was flagged. Distinct from llvm_evidence (which is the
     # downstream IR artefact). Populated by each detector at mk_diag time.

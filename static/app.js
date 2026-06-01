@@ -4,7 +4,7 @@
  * - Diagnostic rendering is stubbed for Phase 3.
  */
 
-const SAMPLE = `// CD_LAB sample — Phase 1 smoke test
+const SAMPLE = `// ai-ub-detection — sample snippet
 #include <stdio.h>
 
 int main(void) {
@@ -279,15 +279,45 @@ function renderLLVMEvidence(d) {
     // Collapsible <details> block of IR instructions backing the diagnostic.
     // Empty/null arrays render nothing — the previous LLVM Evidence panel
     // simply vanishes when no IR is available (e.g. clang missing).
+    // Each row carries its 1-based IR line (llvm_evidence_lines, aligned by
+    // index) as a data attribute so it can scroll the IR viewer on click.
     if (!d.llvm_evidence || !d.llvm_evidence.length) return '';
-    const lines = d.llvm_evidence.map(s => escapeHtml(s)).join('\n');
+    const irLines = d.llvm_evidence_lines || [];
+    const rows = d.llvm_evidence.map((s, i) => {
+        const irLine = irLines[i];
+        if (irLine) {
+            return `<div class="evidence-line jump" data-ir-line="${irLine}" `
+                 + `title="Jump to line ${irLine} in the LLVM IR tab">${escapeHtml(s)}</div>`;
+        }
+        return `<div class="evidence-line">${escapeHtml(s)}</div>`;
+    }).join('');
     return `
         <details class="llvm-evidence" open>
             <summary><strong>Compiler Evidence (LLVM IR)</strong> <span class="muted">(${d.llvm_evidence.length} instr)</span></summary>
-            <pre class="codeblock evidence-code">${lines}</pre>
+            <div class="codeblock evidence-code">${rows}</div>
         </details>
     `;
 }
+
+function jumpToIRLine(line) {
+    // Switch to the LLVM IR tab and scroll its viewer to `line`, flashing a
+    // whole-line highlight. The tab switch may un-hide the editor for the
+    // first time, so defer the reveal until layout settles (rAF) — otherwise
+    // Monaco computes scroll position against a 0-height container.
+    const tab = document.querySelector('.tab[data-tab="llvm"]');
+    if (tab) tab.click();
+    if (!llvmEditor || !window.monaco) return;
+    requestAnimationFrame(() => {
+        llvmEditor.layout();
+        llvmEditor.revealLineInCenter(line);
+        llvmEditor.setPosition({ lineNumber: line, column: 1 });
+        _irEvidenceDeco = llvmEditor.deltaDecorations(_irEvidenceDeco, [{
+            range: new monaco.Range(line, 1, line, 1),
+            options: { isWholeLine: true, className: 'ir-evidence-highlight' },
+        }]);
+    });
+}
+let _irEvidenceDeco = [];
 
 function escapeHtml(text) {
     return text
@@ -381,6 +411,17 @@ function renderDiagnostics(diagnostics) {
         
         li.querySelector('.diag-header').addEventListener('click', focusHandler);
         li.querySelector('.diag-message').addEventListener('click', focusHandler);
+
+        // Click-to-jump: each evidence row scrolls the IR viewer to its
+        // instruction. stopPropagation so it doesn't also trigger the card's
+        // source-focus handler.
+        li.querySelectorAll('.evidence-line.jump').forEach(row => {
+            row.addEventListener('click', evt => {
+                evt.stopPropagation();
+                const line = parseInt(row.dataset.irLine, 10);
+                if (line) jumpToIRLine(line);
+            });
+        });
         
         const btn = li.querySelector(`#btn-${d.id}`);
         btn.addEventListener('click', async (evt) => {

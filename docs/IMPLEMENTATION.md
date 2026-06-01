@@ -72,59 +72,59 @@ code, context_lines}` to Groq via the `groq` Python SDK.
 
 | Path | Role |
 | --- | --- |
-| [backend/main.py](backend/main.py) | FastAPI app entry. Mounts `/static`, registers routes, exposes `/health`. |
-| [backend/schemas.py](backend/schemas.py) | All Pydantic models: `Diagnostic`, `AnalyzeRequest`, `AnalyzeResponse`, `LLVMIR`, `IRMetrics`, `ExplainRequest`, `ExplainResponse`, CFG schemas. |
-| [backend/analyzer/parser.py](backend/analyzer/parser.py) | libclang wrapper. `parse_source(code, language)` writes to a temp file, invokes `cindex.Index.parse`, returns `(TranslationUnit, ASTNode, errors)`. |
-| [backend/analyzer/cfg.py](backend/analyzer/cfg.py) | `_CFGBuilder` walks each function body, emits `BasicBlock`s + labeled edges. Handles `IF_STMT`, `WHILE_STMT`, `DO_STMT`, `FOR_STMT`, `RETURN_STMT`, `BREAK_STMT`, `CONTINUE_STMT`, `COMPOUND_STMT`. |
-| [backend/analyzer/dataflow.py](backend/analyzer/dataflow.py) | Reaching definitions + live variables. `extract_def_use(stmt)` walks an AST subtree, returns `(defined_vars, used_vars)`. Token inspection for `=`, `+=`, `++`, `--`. |
-| [backend/analyzer/detectors/__init__.py](backend/analyzer/detectors/__init__.py) | `DETECTORS` list + `run_all(tu, cfgs, rds, lvs)`. Catches per-detector exceptions, dedupes. |
+| [backend/main.py](../backend/main.py) | FastAPI app entry. Mounts `/static`, registers routes, exposes `/health`. |
+| [backend/schemas.py](../backend/schemas.py) | All Pydantic models: `Diagnostic`, `AnalyzeRequest`, `AnalyzeResponse`, `LLVMIR`, `IRMetrics`, `ExplainRequest`, `ExplainResponse`, CFG schemas. |
+| [backend/analyzer/parser.py](../backend/analyzer/parser.py) | libclang wrapper. `parse_source(code, language)` writes to a temp file, invokes `cindex.Index.parse`, returns `(TranslationUnit, ASTNode, errors)`. |
+| [backend/analyzer/cfg.py](../backend/analyzer/cfg.py) | `_CFGBuilder` walks each function body, emits `BasicBlock`s + labeled edges. Handles `IF_STMT`, `WHILE_STMT`, `DO_STMT`, `FOR_STMT`, `RETURN_STMT`, `BREAK_STMT`, `CONTINUE_STMT`, `COMPOUND_STMT`. |
+| [backend/analyzer/dataflow.py](../backend/analyzer/dataflow.py) | Reaching definitions + live variables. `extract_def_use(stmt)` walks an AST subtree, returns `(defined_vars, used_vars)`. Token inspection for `=`, `+=`, `++`, `--`. |
+| [backend/analyzer/detectors/__init__.py](../backend/analyzer/detectors/__init__.py) | `DETECTORS` list + `run_all(tu, cfgs, rds, lvs)`. Catches per-detector exceptions, dedupes. |
 | `backend/analyzer/detectors/*.py` | One file per category. Each exports `def detect(tu, cfg, rd, lv) -> list[Diagnostic]`. |
-| [backend/analyzer/llvm_ir.py](backend/analyzer/llvm_ir.py) | Shells to `clang -S -emit-llvm -O0 -g -gcolumn-info`. Honours `$CLANG_PATH`. Returns `IRResult(ok, ir, error)`. |
-| [backend/analyzer/ir_introspect.py](backend/analyzer/ir_introspect.py) | Pure-regex IR parser. Emits `IRInstruction`, `IRMetrics`, `ParsedIR`. `evidence_for(parsed, fn, line, category) -> list[str]`. |
-| [backend/llm/client.py](backend/llm/client.py) | `explain_diagnostic(category, message, snippet, lines) -> (explanation, fix)`. Uses `groq.Groq` with Llama 3.3 70B. |
-| [backend/llm/prompts.py](backend/llm/prompts.py) | System prompt + user template. |
-| [backend/routes/analyze.py](backend/routes/analyze.py) | `POST /api/analyze` orchestrator + `GET /api/samples`. |
-| [backend/routes/graph.py](backend/routes/graph.py) | `POST /api/cfg` — serializes one CFG per function to Cytoscape JSON. |
-| [backend/routes/explain.py](backend/routes/explain.py) | `POST /api/explain` — builds snippet context, calls LLM client. |
+| [backend/analyzer/llvm_ir.py](../backend/analyzer/llvm_ir.py) | Shells to `clang -S -emit-llvm -O0 -g -gcolumn-info`. Honours `$CLANG_PATH`. Returns `IRResult(ok, ir, error)`. |
+| [backend/analyzer/ir_introspect.py](../backend/analyzer/ir_introspect.py) | Pure-regex IR parser. Emits `IRInstruction`, `IRMetrics`, `ParsedIR`. `evidence_for(parsed, fn, line, category) -> list[str]`. |
+| [backend/llm/client.py](../backend/llm/client.py) | `explain_diagnostic(category, message, snippet, lines) -> (explanation, fix)`. Uses `groq.Groq` with Llama 3.3 70B. |
+| [backend/llm/prompts.py](../backend/llm/prompts.py) | System prompt + user template. |
+| [backend/routes/analyze.py](../backend/routes/analyze.py) | `POST /api/analyze` orchestrator + `GET /api/samples`. |
+| [backend/routes/graph.py](../backend/routes/graph.py) | `POST /api/cfg` — serializes one CFG per function to Cytoscape JSON. |
+| [backend/routes/explain.py](../backend/routes/explain.py) | `POST /api/explain` — builds snippet context, calls LLM client. |
 
 ### Frontend
 
 | Path | Role |
 | --- | --- |
-| [static/index.html](static/index.html) | Layout, tab markup, script tags. Cytoscape loaded *before* Monaco's AMD loader to avoid `define()` collision. |
-| [static/app.js](static/app.js) | Monaco bootstrap (source + LLVM editors), tab logic, persistence (`localStorage`), `Ctrl+Enter`, `renderDiagnostics`, `renderLLVMIR`, `renderLLVMEvidence`, `renderLLVMMetrics`. |
-| [static/cfg.js](static/cfg.js) | Cytoscape rendering, dagre layout, node-kind styles, click-to-reveal in Monaco. |
-| [static/styles.css](static/styles.css) | Dark theme, tab pills, diagnostic cards, LLVM evidence block, metrics bar. |
-| [static/vendor/](static/vendor/) | Cytoscape + dagre + cytoscape-dagre, vendored to avoid CDN dependency. |
+| [static/index.html](../static/index.html) | Layout, tab markup, script tags. Cytoscape loaded *before* Monaco's AMD loader to avoid `define()` collision. |
+| [static/app.js](../static/app.js) | Monaco bootstrap (source + LLVM editors), tab logic, persistence (`localStorage`), `Ctrl+Enter`, `renderDiagnostics`, `renderLLVMIR`, `renderLLVMEvidence`, `renderLLVMMetrics`. |
+| [static/cfg.js](../static/cfg.js) | Cytoscape rendering, dagre layout, node-kind styles, click-to-reveal in Monaco. |
+| [static/styles.css](../static/styles.css) | Dark theme, tab pills, diagnostic cards, LLVM evidence block, metrics bar. |
+| [static/vendor/](../static/vendor/) | Cytoscape + dagre + cytoscape-dagre, vendored to avoid CDN dependency. |
 
 ### Tests
 
 | Path | Cases |
 | --- | --- |
-| [tests/test_parser.py](tests/test_parser.py) | 3 — libclang load, trivial parse, syntax-error collection |
-| [tests/test_cfg.py](tests/test_cfg.py) | 8 — shape tests for if/else, while/for/do, break/continue, return |
-| [tests/test_dataflow.py](tests/test_dataflow.py) | 10 — def/use extraction, reaching-def kill/union, live-vars dead-store |
-| [tests/test_detectors.py](tests/test_detectors.py) | 7 — one TP per detector |
-| [tests/test_llvm_ir.py](tests/test_llvm_ir.py) | 5 — clang invocation, friendly errors, real end-to-end |
-| [tests/test_ir_introspect.py](tests/test_ir_introspect.py) | 13 — regex parse, dbg-line resolution, evidence tiers, real end-to-end |
+| [tests/test_parser.py](../tests/test_parser.py) | 3 — libclang load, trivial parse, syntax-error collection |
+| [tests/test_cfg.py](../tests/test_cfg.py) | 8 — shape tests for if/else, while/for/do, break/continue, return |
+| [tests/test_dataflow.py](../tests/test_dataflow.py) | 10 — def/use extraction, reaching-def kill/union, live-vars dead-store |
+| [tests/test_detectors.py](../tests/test_detectors.py) | 14 — per-detector TP/TN, C++ idioms (nullptr, new/delete, delete[]), reasoning contract |
+| [tests/test_llvm_ir.py](../tests/test_llvm_ir.py) | 5 — clang invocation, friendly errors, real end-to-end |
+| [tests/test_ir_introspect.py](../tests/test_ir_introspect.py) | 15 — regex parse, dbg-line resolution, evidence tiers, IR line numbers, real end-to-end |
 
-**Total: 46 tests.** Each test that needs the clang CLI auto-skips when
+**Total: 55 tests.** Each test that needs the clang CLI auto-skips when
 clang is missing.
 
 ### Entry-point scripts
 
 | Path | Role |
 | --- | --- |
-| [build.sh](build.sh) | Create `.venv`, `pip install -r requirements.txt`. Idempotent. |
-| [run.sh](run.sh) | Activate `.venv`, start uvicorn on `:8000`. |
-| [evaluate.sh](evaluate.sh) | Activate `.venv`, run `scripts/evaluate.py`. |
-| [scripts/evaluate.py](scripts/evaluate.py) | Walk `testcases/`, run CD_LAB + gcc + clang + cppcheck, compute per-category P/R/F1, print markdown. |
+| [build.sh](../build.sh) | Create `.venv`, `pip install -r requirements.txt`. Idempotent. |
+| [run.sh](../run.sh) | Activate `.venv`, start uvicorn on `:8000`. |
+| [evaluate.sh](../evaluate.sh) | Activate `.venv`, run `scripts/evaluate.py`. |
+| [scripts/evaluate.py](../scripts/evaluate.py) | Walk `testcases/`, run CD_LAB + gcc + clang + cppcheck, compute per-category P/R/F1, print markdown. |
 
 ---
 
 ## 3. CFG construction
 
-`_CFGBuilder` in [cfg.py](backend/analyzer/cfg.py) is structured as a
+`_CFGBuilder` in [cfg.py](../backend/analyzer/cfg.py) is structured as a
 dispatch table on cursor kind. Each handler returns either:
 
 - the **block** new statements should append to (control falls through), or
@@ -200,7 +200,7 @@ def detect(tu, cfg, rd, lv) -> list[Diagnostic]:
     return diags
 ```
 
-Shared helpers in [backend/analyzer/util.py](backend/analyzer/util.py):
+Shared helpers in [backend/analyzer/util.py](../backend/analyzer/util.py):
 
 - `walk_cursor(cursor)` — pre-order AST iterator
 - `is_null_constant(cursor)` — recognise `NULL`, `nullptr`, `0`
@@ -224,7 +224,7 @@ attribution possible: every IR instruction emits a trailing
 `, !dbg !N`, and the bottom of the module has `!N = !DILocation(line:
 M, column: K, scope: !S)` nodes.
 
-[ir_introspect.py](backend/analyzer/ir_introspect.py) parses this in
+[ir_introspect.py](../backend/analyzer/ir_introspect.py) parses this in
 two passes:
 
 1. **First pass** — sweep every line for `!N = !DILocation(line: M`
@@ -267,13 +267,13 @@ For the longer rationale and scope-locks see
 
 ## 7. LLM explanation layer
 
-[backend/routes/explain.py](backend/routes/explain.py) builds an
+[backend/routes/explain.py](../backend/routes/explain.py) builds an
 explanation request by:
 
 1. Slicing the source around the diagnostic line (`±context_lines`,
    default 3), with the offending line marked `<-- {message}`.
 2. Passing `(category, message, snippet, start_line, end_line)` to
-   `explain_diagnostic` in [backend/llm/client.py](backend/llm/client.py).
+   `explain_diagnostic` in [backend/llm/client.py](../backend/llm/client.py).
 
 The Groq SDK call uses `llama-3.3-70b-versatile` with temperature
 0.1. The model is asked for JSON only:
@@ -321,9 +321,9 @@ on the page triggers Analyze.
 | `CLANG_PATH` | Override clang lookup for LLVM IR | first `clang` on PATH |
 | `LIBCLANG_PATH` | Override libclang.dll path | bundled in `libclang` PyPI package |
 
-Example: see [.env.example](.env.example). `python-dotenv` loads
-`.env` at import time in [backend/main.py](backend/main.py) and in
-[conftest.py](conftest.py) so pytest picks up the same config.
+Example: see [.env.example](../.env.example). `python-dotenv` loads
+`.env` at import time in [backend/main.py](../backend/main.py) and in
+[conftest.py](../conftest.py) so pytest picks up the same config.
 
 ---
 
@@ -338,7 +338,7 @@ Example: see [.env.example](.env.example). `python-dotenv` loads
 | LLVM IR | Two layers: (1) parser pure-string tests, (2) end-to-end tests that shell out to real clang and assert the IR contains expected opcodes (auto-skip when clang missing). |
 | Integration | The evaluation harness *is* the integration test: it exercises every layer end-to-end against the testcases directory. |
 
-`pytest tests/` runs all 46 cases in ~2 s on the dev machine.
+`pytest tests/` runs all 55 cases in ~3 s on the dev machine.
 
-`./evaluate.sh` runs the full pipeline against the 17 testcases plus
+`./evaluate.sh` runs the full pipeline against the 25 testcases plus
 gcc / clang baselines in ~30 s on the dev machine.

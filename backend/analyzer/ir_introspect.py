@@ -52,6 +52,7 @@ class IRInstruction:
     text: str            # raw .ll line (trimmed, no trailing comma+dbg)
     function: str        # containing function name (no @ prefix)
     dbg_line: int | None # source line via !dbg → !DILocation, else None
+    ir_line: int         # 1-based line number within the .ll text (for click-to-jump)
 
 
 @dataclass
@@ -100,7 +101,10 @@ def parse_ir(ir_text: str) -> ParsedIR:
     current_func: str | None = None
     brace_depth = 0
 
-    for raw in ir_text.splitlines():
+    # `ir_line_no` is the 1-based line number in the raw .ll text. We keep it
+    # on every IRInstruction so the frontend can scroll the IR viewer to the
+    # exact instruction backing a diagnostic (click-to-jump).
+    for ir_line_no, raw in enumerate(ir_text.splitlines(), start=1):
         stripped = raw.strip()
         if not stripped or stripped.startswith(";"):
             continue
@@ -157,6 +161,7 @@ def parse_ir(ir_text: str) -> ParsedIR:
             text=display,
             function=current_func,
             dbg_line=dbg_line,
+            ir_line=ir_line_no,
         )
         instructions.append(ins)
         by_func.setdefault(current_func, []).append(ins)
@@ -171,21 +176,25 @@ def parse_ir(ir_text: str) -> ParsedIR:
     )
 
 
-def evidence_for(
+def evidence_instrs_for(
     parsed: ParsedIR,
     function: str | None,
     line: int | None,
     category: str,
     *,
     limit: int = 3,
-) -> list[str]:
-    """Return up to `limit` IR instruction texts relevant to a diagnostic.
+) -> list[IRInstruction]:
+    """Return up to `limit` IR instructions relevant to a diagnostic.
 
     Priority:
     1. If we have `(function, line)` and a non-empty hit — return those.
     2. Else if we have `function` — return all relevant kinds in that
        function (capped at limit).
     3. Else — return [].
+
+    Returns the full `IRInstruction` records so callers can read both the
+    display `text` and the `ir_line` (used for click-to-jump). For just the
+    text, see `evidence_for`.
     """
     kinds = CATEGORY_TO_KINDS.get(category)
     if not kinds:
@@ -194,16 +203,32 @@ def evidence_for(
     # Tier 1: exact source-line evidence (requires -g).
     if function and line is not None:
         hits = parsed.by_function_line.get((function, line), [])
-        relevant = [ins.text for ins in hits if ins.kind in kinds]
+        relevant = [ins for ins in hits if ins.kind in kinds]
         if relevant:
             return relevant[:limit]
 
     # Tier 2: function-level fallback.
     if function and function in parsed.by_function:
-        relevant = [ins.text for ins in parsed.by_function[function] if ins.kind in kinds]
+        relevant = [ins for ins in parsed.by_function[function] if ins.kind in kinds]
         return relevant[:limit]
 
     return []
+
+
+def evidence_for(
+    parsed: ParsedIR,
+    function: str | None,
+    line: int | None,
+    category: str,
+    *,
+    limit: int = 3,
+) -> list[str]:
+    """Return up to `limit` IR instruction *texts* relevant to a diagnostic.
+
+    Thin wrapper over `evidence_instrs_for` preserved for callers (and tests)
+    that only need the textual lines.
+    """
+    return [ins.text for ins in evidence_instrs_for(parsed, function, line, category, limit=limit)]
 
 
 def _strip_trailing_dbg(line: str) -> str:

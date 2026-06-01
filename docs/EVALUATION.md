@@ -16,19 +16,23 @@ the analyzer works see [IMPLEMENTATION.md](IMPLEMENTATION.md).
 
 ## 1. Test corpus
 
-17 hand-written Juliet-style cases under [testcases/](../testcases/),
+25 hand-written Juliet-style cases under [testcases/](../testcases/),
 covering all 7 UB categories:
 
 | Category | CWE | Bad cases | Good cases |
 | --- | --- | ---: | ---: |
-| `null_deref` | CWE-476 | 2 | 1 |
+| `null_deref` | CWE-476 | 4 | 2 |
 | `uninit` | CWE-457 | 2 | 1 |
-| `div_zero` | CWE-369 | 2 | 1 |
-| `oob` | CWE-787 / CWE-125 | 1 | 1 |
-| `use_after_free` | CWE-416 | 1 | 1 |
-| `dangling` | CWE-562 | 1 | 1 |
+| `div_zero` | CWE-369 | 3 | 1 |
+| `oob` | CWE-787 / CWE-125 | 2 | 1 |
+| `use_after_free` | CWE-416 | 2 | 2 |
+| `dangling` | CWE-562 | 2 | 1 |
 | `int_overflow` | CWE-190 | 1 | 1 |
-| **TOTAL** | | **10** | **7** |
+| **TOTAL** | | **16** | **9** |
+
+Several cases (notably the `null_deref`, `use_after_free`, and
+`dangling` additions) are written in C++ to exercise `nullptr`,
+`new`/`delete`, and `delete[]` idioms alongside the C cases.
 
 **Naming convention:** `<label>_<category>_<n>.<ext>` where `label` is
 `bad` (UB present, must be detected) or `good` (no UB, must NOT be
@@ -100,29 +104,29 @@ Run it:
 
 | Category | TP | FP | TN | FN | Precision | Recall | F1 |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| `dangling` | 1 | 0 | 1 | 0 | 1.00 | 1.00 | 1.00 |
-| `div_zero` | 2 | 0 | 1 | 0 | 1.00 | 1.00 | 1.00 |
+| `dangling` | 2 | 0 | 1 | 0 | 1.00 | 1.00 | 1.00 |
+| `div_zero` | 3 | 0 | 1 | 0 | 1.00 | 1.00 | 1.00 |
 | `int_overflow` | 1 | 0 | 1 | 0 | 1.00 | 1.00 | 1.00 |
-| `null_deref` | 1 | 0 | 1 | 1 | 1.00 | 0.50 | 0.67 |
-| `oob` | 1 | 0 | 1 | 0 | 1.00 | 1.00 | 1.00 |
+| `null_deref` | 3 | 0 | 2 | 1 | 1.00 | 0.75 | 0.86 |
+| `oob` | 2 | 0 | 1 | 0 | 1.00 | 1.00 | 1.00 |
 | `uninit` | 2 | 0 | 1 | 0 | 1.00 | 1.00 | 1.00 |
-| `use_after_free` | 1 | 0 | 1 | 0 | 1.00 | 1.00 | 1.00 |
+| `use_after_free` | 2 | 0 | 2 | 0 | 1.00 | 1.00 | 1.00 |
 
 ### Aggregate — CD_LAB vs. baselines
 
 | Tool | TP | FP | TN | FN | Precision | Recall | F1 |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| **`cdlab`** | **9** | **0** | **7** | **1** | **1.00** | **0.90** | **0.95** |
-| `gcc -fanalyzer` | 4 | 0 | 7 | 6 | 1.00 | 0.40 | 0.57 |
-| `clang --analyze` | 9 | 0 | 7 | 1 | 1.00 | 0.90 | 0.95 |
+| **`cdlab`** | **15** | **0** | **9** | **1** | **1.00** | **0.94** | **0.97** |
+| `gcc -fanalyzer` | 5 | 0 | 9 | 11 | 1.00 | 0.31 | 0.48 |
+| `clang --analyze` | 14 | 0 | 9 | 2 | 1.00 | 0.88 | 0.93 |
 
 ### Headlines
 
 - **Precision = 1.00** on every category and overall. Every flag is a
   true positive. Zero false alarms.
-- **Recall = 0.90** overall. Nine of ten "bad" cases caught.
-- **F1 = 0.95** ties the Clang Static Analyzer and beats `gcc
-  -fanalyzer` by 0.38.
+- **Recall = 0.94** overall. 15 of 16 "bad" cases caught.
+- **F1 = 0.97** edges out the Clang Static Analyzer (0.93) and beats
+  `gcc -fanalyzer` by 0.49.
 - The single false negative is documented below.
 
 ---
@@ -144,7 +148,7 @@ CD_LAB recognises the null assignment pattern when it appears in a
 `VAR_DECL` initializer (`int *p = NULL;`) but the second-statement
 form `p = 0;` after a separate declaration is missed by the current
 `_find_null_inits` walk. This is a small fix in
-[backend/analyzer/detectors/null_deref.py](backend/analyzer/detectors/null_deref.py)
+[backend/analyzer/detectors/null_deref.py](../backend/analyzer/detectors/null_deref.py)
 — catching the BINARY_OPERATOR `=` with `is_null_constant(rhs)` and
 adding it to the null-defs set. Tracked as future work.
 
@@ -161,7 +165,7 @@ end-to-end UB detection:
 
 ```
 $ pytest tests/
-46 passed in 1.97s
+55 passed in 3.07s
 ```
 
 Breakdown:
@@ -171,10 +175,10 @@ Breakdown:
 | `test_parser.py` | 3 | libclang load, trivial parse, syntax errors |
 | `test_cfg.py` | 8 | shape tests for if/else, while, for, do, break, continue |
 | `test_dataflow.py` | 10 | reaching-defs kill/union, live-vars dead-store, def/use extraction |
-| `test_detectors.py` | 7 | one TP per detector |
+| `test_detectors.py` | 14 | per-detector TP/TN, C++ idioms (nullptr, new/delete, delete[]), reasoning contract |
 | `test_llvm_ir.py` | 5 | clang invocation, friendly errors, real end-to-end |
-| `test_ir_introspect.py` | 13 | regex parse, dbg-line resolution, evidence tiers, real end-to-end |
-| **TOTAL** | **46** | |
+| `test_ir_introspect.py` | 15 | regex parse, dbg-line resolution, evidence tiers, IR line numbers, real end-to-end |
+| **TOTAL** | **55** | |
 
 Tests that require the real `clang` CLI auto-skip when it's missing.
 
@@ -199,15 +203,16 @@ Expected runtime: ~30 s for `evaluate.sh`, ~2 s for `pytest tests/`.
 
 Honest list of what these numbers don't show:
 
-- **17 cases is small.** Each case is hand-written; we know the
+- **25 cases is small.** Each case is hand-written; we know the
   expected outcome by construction. A bigger run against the full
   NIST Juliet C++ corpus would surface more failure modes.
 - **Keyword-matching for baselines is imperfect.** `gcc -fanalyzer`
   sometimes emits warnings whose phrasing doesn't include our
   keyword for the relevant category. We err on the side of being
   generous (see [scripts/evaluate.py::BASELINE_KEYWORDS](../scripts/evaluate.py)).
-- **No inter-procedural cases.** Every test case is single-function.
-  Real-world UB often spans calls.
+- **No inter-procedural analysis.** Detection is intra-procedural —
+  each flag is decided within one function (even when a case defines a
+  helper plus `main`). Real-world UB often spans calls.
 - **No optimization-sensitive cases.** All testcases compile and
   run identically at every `-O` level; we don't test UB that only
   manifests after `-O2` constant-folding.

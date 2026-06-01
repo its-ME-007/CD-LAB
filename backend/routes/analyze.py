@@ -13,7 +13,7 @@ from ..analyzer import (
     reaching_definitions,
     run_all,
 )
-from ..analyzer.ir_introspect import evidence_for, parse_ir
+from ..analyzer.ir_introspect import evidence_instrs_for, parse_ir
 from ..schemas import AnalyzeRequest, AnalyzeResponse, IRMetrics, LLVMIR
 
 router = APIRouter(prefix="/api", tags=["analyze"])
@@ -60,9 +60,10 @@ def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
             # analyzer/cfg.py::_CFGBuilder._new_block).
             for d in diagnostics:
                 func = d.cfg_node_id.split("#", 1)[0] if d.cfg_node_id else None
-                ev = evidence_for(parsed, func, d.range.line, d.category)
-                if ev:
-                    d.llvm_evidence = ev
+                instrs = evidence_instrs_for(parsed, func, d.range.line, d.category)
+                if instrs:
+                    d.llvm_evidence = [i.text for i in instrs]
+                    d.llvm_evidence_lines = [i.ir_line for i in instrs]
         except Exception:  # noqa: BLE001
             # Don't let an IR-parse hiccup break the analyze endpoint.
             metrics_model = None

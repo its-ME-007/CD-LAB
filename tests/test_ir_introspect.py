@@ -7,6 +7,7 @@ import pytest
 from backend.analyzer.ir_introspect import (
     CATEGORY_TO_KINDS,
     evidence_for,
+    evidence_instrs_for,
     parse_ir,
 )
 from backend.analyzer.llvm_ir import clang_available, generate_llvm_ir
@@ -135,6 +136,30 @@ def test_evidence_for_respects_limit():
     parsed = parse_ir(_SAMPLE_IR_WITH_DBG)
     ev = evidence_for(parsed, "demo", None, category="null_deref", limit=1)
     assert len(ev) <= 1
+
+
+def test_parse_records_ir_line_numbers():
+    # ir_line is the 1-based line within the .ll text. The sdiv lives on
+    # line 10 of _SAMPLE_IR_WITH_DBG (1: ModuleID, 2: source_filename,
+    # 3: blank, 4: define, 5-9: body, 10: sdiv... count it explicitly).
+    parsed = parse_ir(_SAMPLE_IR_WITH_DBG)
+    lines = _SAMPLE_IR_WITH_DBG.splitlines()
+    for ins in parsed.instructions:
+        assert ins.ir_line >= 1
+        # The recorded line, when stripped, must start with the same text
+        # we stored (modulo the trailing !dbg we strip from `text`).
+        raw = lines[ins.ir_line - 1].strip()
+        assert raw.startswith(ins.text), (ins.ir_line, raw, ins.text)
+
+
+def test_evidence_instrs_for_carries_ir_line():
+    parsed = parse_ir(_SAMPLE_IR_WITH_DBG)
+    instrs = evidence_instrs_for(parsed, "demo", 5, category="div_zero")
+    assert instrs, "expected an sdiv instruction"
+    assert all(i.ir_line >= 1 for i in instrs)
+    # evidence_for must stay aligned with evidence_instrs_for (text-only view).
+    texts = evidence_for(parsed, "demo", 5, category="div_zero")
+    assert texts == [i.text for i in instrs]
 
 
 def test_category_kinds_cover_every_ub_category():

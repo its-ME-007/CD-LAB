@@ -105,6 +105,21 @@ A header strip above the IR viewer reporting:
 - Memory ops (`load + store + getelementptr`)
 - Arithmetic ops (`add + sub + mul + sdiv + udiv + shl`)
 
+### 4. Click-to-jump from evidence to the IR viewer
+Each evidence row is clickable: clicking it switches to the **LLVM IR**
+tab and scrolls the viewer to the exact instruction, flashing a
+whole-line highlight. This is the visual completion of the cause→effect
+story — the AST Reasoning is the cause, and one click takes you from the
+evidence snippet to where that instruction lives in the full module.
+
+Mechanism: every parsed `IRInstruction` carries its 1-based `ir_line`
+(its line in the `.ll` text). `evidence_instrs_for` returns the
+instructions, and the route attaches their line numbers as
+`Diagnostic.llvm_evidence_lines` (aligned 1:1 with `llvm_evidence`). The
+frontend reads that array and calls `revealLineInCenter` on the IR Monaco
+editor. No new analysis — it reuses the source-line resolution that
+already powers the evidence snippets.
+
 ---
 
 ## What LLVM does NOT contribute (explicitly out of scope)
@@ -119,11 +134,6 @@ These were considered and rejected to keep scope honest:
   AST/CFG/dataflow detectors. The LLVM layer never decides "this is
   UB"; it only ever shows *evidence for* what AST already flagged.
 - ❌ **`-O2` vs `-O0` comparison** — interesting but out of scope.
-- ❌ **Interactive click-to-jump** from a diagnostic into the IR tab
-  with line highlighting. Evidence is shown statically inside the
-  diagnostic card; the IR tab is browsed independently. This is the
-  single most common misread of the scope — re-read the viva line
-  above if tempted to build it.
 - ❌ **llvmlite or any LLVM Python binding** — adds ~50 MB of
   toolchain coupling we don't need. The IR we parse is `clang -O0`
   output, which is regular enough for stdlib regex.
@@ -167,11 +177,11 @@ These were considered and rejected to keep scope honest:
 | Path | Role |
 | --- | --- |
 | [backend/analyzer/llvm_ir.py](../backend/analyzer/llvm_ir.py) | Shells out to clang, returns `IRResult(ok, ir, error)`. Honours `$CLANG_PATH`. |
-| [backend/analyzer/ir_introspect.py](../backend/analyzer/ir_introspect.py) | Regex IR parser. `parse_ir(text) → ParsedIR`, `evidence_for(parsed, fn, line, category) → list[str]`. |
-| [backend/schemas.py](../backend/schemas.py) | `IRMetrics`, `LLVMIR.metrics`, `Diagnostic.llvm_evidence`. |
+| [backend/analyzer/ir_introspect.py](../backend/analyzer/ir_introspect.py) | Regex IR parser. `parse_ir(text) → ParsedIR`, `evidence_instrs_for(...) → list[IRInstruction]` (carries `ir_line`), `evidence_for(...) → list[str]`. |
+| [backend/schemas.py](../backend/schemas.py) | `IRMetrics`, `LLVMIR.metrics`, `Diagnostic.llvm_evidence` + `Diagnostic.llvm_evidence_lines`. |
 | [backend/routes/analyze.py](../backend/routes/analyze.py) | Calls generator + introspector, decorates diagnostics, returns `AnalyzeResponse.llvm_ir`. |
 | [static/index.html](../static/index.html) | LLVM IR tab + metrics-bar placeholder. |
-| [static/app.js](../static/app.js) | `renderLLVMIR(payload)`, `renderLLVMMetrics(m)`, `renderLLVMEvidence(d)`. |
+| [static/app.js](../static/app.js) | `renderLLVMIR(payload)`, `renderLLVMMetrics(m)`, `renderLLVMEvidence(d)`, `jumpToIRLine(line)`. |
 | [static/styles.css](../static/styles.css) | `.llvm-metrics-bar`, `.llvm-evidence`, `.evidence-code`. |
 | [tests/test_llvm_ir.py](../tests/test_llvm_ir.py) | clang generation tests; auto-skip when clang missing. |
 | [tests/test_ir_introspect.py](../tests/test_ir_introspect.py) | Parser/metrics/evidence tests. |
@@ -192,14 +202,17 @@ For input `int main(){int *p=0; *p=5; return p[0]/0;}`:
    - Pass 1 collects `!DILocation` entries into `{metadata_id → line}`.
    - Pass 2 walks instructions, records opcode, function, and resolves
      trailing `, !dbg !N` to a source line.
-4. **`evidence_for`** is called per diagnostic with `(function_name,
-   source_line, category)`. The function name is recovered from
-   `Diagnostic.cfg_node_id` (which is `"<funcname>#<n>"`). Up to 3
-   relevant instruction texts are attached to `Diagnostic.llvm_evidence`.
+4. **`evidence_instrs_for`** is called per diagnostic with
+   `(function_name, source_line, category)`. The function name is
+   recovered from `Diagnostic.cfg_node_id` (which is `"<funcname>#<n>"`).
+   Up to 3 relevant instructions are returned; their `.text` goes to
+   `Diagnostic.llvm_evidence` and their `.ir_line` to
+   `Diagnostic.llvm_evidence_lines` (aligned by index).
 5. **`AnalyzeResponse.llvm_ir.metrics`** carries module-level counts.
 6. **Frontend** renders:
    - Collapsible `<details class="llvm-evidence">` block under each
-     diagnostic.
+     diagnostic, one clickable row per instruction. Clicking a row calls
+     `jumpToIRLine` → switches to the IR tab and reveals/flashes that line.
    - `<div class="llvm-metrics-bar">` above the IR viewer.
 
 ---
@@ -256,8 +269,8 @@ A suggested structure for the "LLVM" section of the final report:
    `int main(){int *p=0; *p=5; return p[0]/0;}` example used above —
    it produces both `store ptr null` and `sdiv i32 %, 0` evidence in
    under 15 lines of IR.
-4. **Limitations** — say plainly: no IR-based UB detection, no source
-   ↔ IR click-nav, no optimisation comparison. This is a *secondary*
-   layer.
+4. **Limitations** — say plainly: no IR-based UB detection, no
+   optimisation comparison. This is a *secondary* layer; it evidences
+   UB, it never decides it.
 5. **Toolchain** — Clang 18.1.8 + the `libclang` PyPI package for
    AST parsing.

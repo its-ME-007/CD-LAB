@@ -284,8 +284,41 @@ select, .btn {
     font-size: 11px;
     background: #0f172a;
     border: 1px solid #1e293b;
-    padding: 8px 10px;
+    padding: 6px 4px;
     max-height: 160px;
+    overflow: auto;
+}
+/* Each evidence row is one IR instruction. `.jump` rows are clickable and
+   scroll the IR viewer to the matching line. */
+.llvm-evidence .evidence-line {
+    font-family: var(--mono, ui-monospace, monospace);
+    white-space: pre;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: var(--text);
+}
+.llvm-evidence .evidence-line.jump {
+    cursor: pointer;
+    transition: background 0.12s ease-in-out;
+}
+.llvm-evidence .evidence-line.jump::before {
+    content: "↳ ";
+    color: var(--accent-2);
+    opacity: 0.7;
+}
+.llvm-evidence .evidence-line.jump:hover {
+    background: rgba(76, 194, 255, 0.14);
+    color: var(--accent-2);
+}
+
+/* Transient whole-line flash in the IR viewer after a click-to-jump. */
+.ir-evidence-highlight {
+    background: rgba(76, 194, 255, 0.22);
+    animation: ir-evidence-fade 1.6s ease-out;
+}
+@keyframes ir-evidence-fade {
+    0%   { background: rgba(76, 194, 255, 0.45); }
+    100% { background: rgba(76, 194, 255, 0.12); }
 }
 
 /* Styling for interactive diagnostic cards and LLM explanations */

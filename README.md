@@ -84,7 +84,7 @@ See [docs/EVALUATION.md](docs/EVALUATION.md) for the methodology and current sco
 ### Run the test suite
 
 ```bash
-.venv/Scripts/python -m pytest tests/   # 47 tests
+.venv/Scripts/python -m pytest tests/   # 55 tests
 ```
 
 ---
@@ -107,9 +107,9 @@ CD_LAB/
 │
 ├── static/                <- vanilla HTML + Monaco + Cytoscape ("src" for the UI)
 │
-├── tests/                 <- pytest (47 cases, including end-to-end with real clang)
+├── tests/                 <- pytest (55 cases, including end-to-end with real clang)
 │
-├── testcases/             <- 17 Juliet-style cases used by the evaluation harness
+├── testcases/             <- 25 Juliet-style cases used by the evaluation harness
 ├── scripts/evaluate.py    <- the harness itself
 │
 ├── samples/               <- 4 hand-written examples loaded by the UI dropdown
