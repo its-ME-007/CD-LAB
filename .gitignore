@@ -7,3 +7,9 @@ __pycache__/
 .idea/
 .vscode/
 *.log
+# Build artefacts
+eval-results.md
+*.crdownload
+# OS noise
+.DS_Store
+Thumbs.db

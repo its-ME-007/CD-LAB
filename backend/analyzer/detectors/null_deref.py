@@ -88,12 +88,29 @@ def detect(
                     if var_defs:
                         null_defs = {d for d in var_defs
                                      if (d.var, d.block_id, d.stmt_index, d.line) in null_definitions}
+                        deref_line = sub_c.location.line or 0
+                        null_lines = sorted({d.line for d in null_defs if d.line})
                         if len(null_defs) == len(var_defs):
+                            reasoning = [
+                                f"Pointer '{var}' assigned NULL at line {null_lines[0]}"
+                                if null_lines else f"Pointer '{var}' assigned NULL",
+                                f"No reassignment to a non-null value reaches line {deref_line}",
+                                f"Dereferenced via *{var} at line {deref_line}",
+                            ]
                             diags.append(mk_diag("null_deref", "error", sub_c,
-                                                 f"Dereference of null pointer '{var}'", bid))
+                                                 f"Dereference of null pointer '{var}'", bid,
+                                                 reasoning=reasoning))
                         elif null_defs:
+                            reasoning = [
+                                (f"Pointer '{var}' may be NULL on some paths "
+                                 f"(reaching null defs at lines {null_lines})"
+                                 if null_lines else f"Pointer '{var}' may be NULL on some paths"),
+                                f"Other reaching definitions exist but null is not ruled out",
+                                f"Dereferenced via *{var} at line {deref_line}",
+                            ]
                             diags.append(mk_diag("null_deref", "warning", sub_c,
-                                                 f"Pointer '{var}' may be null when dereferenced", bid))
+                                                 f"Pointer '{var}' may be null when dereferenced", bid,
+                                                 reasoning=reasoning))
 
             # Update local reaching defs
             stmt_defs, _ = extract_def_use(stmt)

@@ -69,9 +69,12 @@ def detect(
     if not blocks:
         return diags
 
-    # Pass 1: compute per-block GEN (freed vars) and KILL (reassigned vars)
+    # Pass 1: compute per-block GEN (freed vars) and KILL (reassigned vars).
+    # Also record the source line of every free() / delete site so the
+    # reasoning bullets can name a concrete line.
     gen: dict[str, set[str]] = {b: set() for b in blocks}
     kill: dict[str, set[str]] = {b: set() for b in blocks}
+    freed_at: dict[str, list[int]] = {}
     for bid in blocks:
         block = cfg.graph.nodes[bid]["block"]
         freed_local: set[str] = set()
@@ -81,6 +84,7 @@ def detect(
             if freed:
                 freed_local.add(freed)
                 killed_local.discard(freed)
+                freed_at.setdefault(freed, []).append(stmt.location.line or 0)
             stmt_defs, _ = extract_def_use(stmt)
             for v in stmt_defs:
                 freed_local.discard(v)
@@ -129,12 +133,22 @@ def detect(
                         and sub_c.spelling
                         and sub_c.spelling in current_freed
                         and sub_c.spelling in stmt_uses):
+                    var = sub_c.spelling
+                    use_line = sub_c.location.line or 0
+                    fr_lines = sorted({ln for ln in freed_at.get(var, []) if ln})
+                    reasoning = [
+                        (f"Pointer '{var}' freed at line {fr_lines[0]}"
+                         if fr_lines else f"Pointer '{var}' freed by free()/delete"),
+                        f"No reassignment of '{var}' between free and use",
+                        f"'{var}' used at line {use_line}",
+                    ]
                     diags.append(mk_diag(
                         category="use_after_free",
                         severity="error",
                         cursor=sub_c,
-                        message=f"Use of freed pointer '{sub_c.spelling}'",
+                        message=f"Use of freed pointer '{var}'",
                         cfg_node_id=bid,
+                        reasoning=reasoning,
                     ))
                     break  # one diagnostic per statement is enough
 

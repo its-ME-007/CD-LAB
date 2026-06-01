@@ -156,3 +156,31 @@ def test_integer_overflow():
     overflow_diags = [d for d in diags if d.category == "int_overflow"]
     assert len(overflow_diags) >= 1
     assert "overflow" in overflow_diags[0].message.lower()
+
+
+def test_every_detector_populates_reasoning():
+    """Every positive diagnostic from every detector must carry a non-empty
+    `reasoning` list. The "AST Reasoning" UI block depends on this contract."""
+    samples = [
+        # (category, code, language)
+        ("null_deref",     "void f(){int*p=0;*p=1;}",                                 "cpp"),
+        ("uninit",         "int f(){int x; return x+1;}",                              "c"),
+        ("div_zero",       "int f(){return 10/0;}",                                    "c"),
+        ("oob",            "void f(){int a[3]={1,2,3}; a[5]=1;}",                      "c"),
+        ("use_after_free", "#include <stdlib.h>\nvoid f(){int*p=(int*)malloc(4);free(p);*p=1;}", "c"),
+        ("dangling",       "int* f(){int x=42; return &x;}",                           "c"),
+        ("int_overflow",   "int f(){return 2147483647+1;}",                            "c"),
+    ]
+    for category, code, lang in samples:
+        diags = _diagnostics_for(code, language=lang)
+        matches = [d for d in diags if d.category == category]
+        assert matches, f"detector {category} produced no diagnostic for {code!r}"
+        for d in matches:
+            assert d.reasoning, f"{category} diagnostic missing reasoning: {d!r}"
+            assert len(d.reasoning) >= 2, (
+                f"{category} reasoning should have >=2 bullets, got {d.reasoning!r}"
+            )
+            for bullet in d.reasoning:
+                assert isinstance(bullet, str) and bullet.strip(), (
+                    f"{category} reasoning bullet must be a non-empty string: {bullet!r}"
+                )

@@ -40,6 +40,11 @@ class Diagnostic(BaseModel):
     explanation: str | None = None
     fix_suggestion: str | None = None
     cfg_node_id: str | None = None
+    llvm_evidence: list[str] | None = None
+    # 2-3 plain-text bullets from the AST/CFG/dataflow detector describing
+    # *why* this code was flagged. Distinct from llvm_evidence (which is the
+    # downstream IR artefact). Populated by each detector at mk_diag time.
+    reasoning: list[str] | None = None
 
 
 class ASTNode(BaseModel):
@@ -59,10 +64,19 @@ class AnalyzeRequest(BaseModel):
     filename: str | None = None
 
 
+class IRMetrics(BaseModel):
+    functions: int = 0
+    basic_blocks: int = 0
+    instructions: int = 0
+    memory_ops: int = 0
+    arithmetic_ops: int = 0
+
+
 class LLVMIR(BaseModel):
     ok: bool
     ir: str | None = None
     error: str | None = None
+    metrics: IRMetrics | None = None
 
 
 class AnalyzeResponse(BaseModel):

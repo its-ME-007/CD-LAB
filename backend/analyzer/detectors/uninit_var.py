@@ -49,13 +49,22 @@ def detect(
                         # Check reaching definitions
                         var_defs = {d for d in current_reaching if d.var == var}
                         if len(var_defs) == 0:
+                            decl_cursor = uninit_candidates[var]
+                            decl_line = decl_cursor.location.line or 0
+                            use_line = sub_c.location.line or 0
+                            reasoning = [
+                                f"Variable '{var}' declared without initializer at line {decl_line}",
+                                f"No reaching definition for '{var}' at the use site",
+                                f"'{var}' read at line {use_line}",
+                            ]
                             diags.append(
                                 mk_diag(
                                     category="uninit",
                                     severity="error",
                                     cursor=sub_c,
                                     message=f"Use of uninitialized variable '{var}'",
-                                    cfg_node_id=bid
+                                    cfg_node_id=bid,
+                                    reasoning=reasoning,
                                 )
                             )
             

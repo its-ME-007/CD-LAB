@@ -49,13 +49,22 @@ def detect(
                                         is_local = True
                                         
                                 if is_local:
+                                    decl_line = decl.location.line or 0
+                                    return_line = sub_c.location.line or 0
+                                    storage = "parameter" if decl.kind.name == "PARM_DECL" else "automatic-storage local"
+                                    reasoning = [
+                                        f"Address of '{operand.spelling}' taken with unary '&'",
+                                        f"'{operand.spelling}' is a {storage} declared at line {decl_line}",
+                                        f"Address escapes via return at line {return_line}",
+                                    ]
                                     diags.append(
                                         mk_diag(
                                             category="dangling",
                                             severity="error",
                                             cursor=sub_c,
                                             message=f"Address of local stack variable '{operand.spelling}' returned",
-                                            cfg_node_id=None # We can leave this empty or match block id if we want
+                                            cfg_node_id=None,  # we can leave this empty or match block id if we want
+                                            reasoning=reasoning,
                                         )
                                     )
                                     

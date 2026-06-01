@@ -1,0 +1,21 @@
+{
+  "_comment": "Test-case manifest used by scripts/evaluate.py. Filenames follow the pattern <label>_<category>_<n>.<ext> where label is 'good' or 'bad' and category matches backend/schemas.py::UBCategory.",
+  "categories": [
+    "null_deref",
+    "uninit",
+    "div_zero",
+    "oob",
+    "use_after_free",
+    "dangling",
+    "int_overflow"
+  ],
+  "cwe_mapping": {
+    "null_deref":     "CWE-476",
+    "uninit":         "CWE-457",
+    "div_zero":       "CWE-369",
+    "oob":            "CWE-787 / CWE-125",
+    "use_after_free": "CWE-416",
+    "dangling":       "CWE-562",
+    "int_overflow":   "CWE-190"
+  }
+}

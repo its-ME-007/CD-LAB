@@ -13,7 +13,8 @@ from ..analyzer import (
     reaching_definitions,
     run_all,
 )
-from ..schemas import AnalyzeRequest, AnalyzeResponse, LLVMIR
+from ..analyzer.ir_introspect import evidence_for, parse_ir
+from ..schemas import AnalyzeRequest, AnalyzeResponse, IRMetrics, LLVMIR
 
 router = APIRouter(prefix="/api", tags=["analyze"])
 
@@ -39,7 +40,39 @@ def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
     # If clang is missing or codegen fails (e.g. user pasted invalid source),
     # we surface ok=False + a message in the IR tab and continue.
     ir_result = generate_llvm_ir(req.code, language=req.language)
-    llvm_ir = LLVMIR(ok=ir_result.ok, ir=ir_result.ir, error=ir_result.error)
+
+    # Introspect the IR (regex parser) so we can both (a) attach LLVM
+    # evidence to each diagnostic and (b) report module-level metrics.
+    # Failures here are silently downgraded — IR is a courtesy artifact.
+    metrics_model: IRMetrics | None = None
+    if ir_result.ok and ir_result.ir:
+        try:
+            parsed = parse_ir(ir_result.ir)
+            metrics_model = IRMetrics(
+                functions=parsed.metrics.functions,
+                basic_blocks=parsed.metrics.basic_blocks,
+                instructions=parsed.metrics.instructions,
+                memory_ops=parsed.metrics.memory_ops,
+                arithmetic_ops=parsed.metrics.arithmetic_ops,
+            )
+            # Attach evidence to each diagnostic. The function name is
+            # encoded in cfg_node_id as "<funcname>#<n>" (see
+            # analyzer/cfg.py::_CFGBuilder._new_block).
+            for d in diagnostics:
+                func = d.cfg_node_id.split("#", 1)[0] if d.cfg_node_id else None
+                ev = evidence_for(parsed, func, d.range.line, d.category)
+                if ev:
+                    d.llvm_evidence = ev
+        except Exception:  # noqa: BLE001
+            # Don't let an IR-parse hiccup break the analyze endpoint.
+            metrics_model = None
+
+    llvm_ir = LLVMIR(
+        ok=ir_result.ok,
+        ir=ir_result.ir,
+        error=ir_result.error,
+        metrics=metrics_model,
+    )
 
     elapsed_ms = (time.perf_counter() - t0) * 1000
 

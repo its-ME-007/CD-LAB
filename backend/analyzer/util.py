@@ -70,16 +70,22 @@ def mk_diag(
     severity: str,
     cursor: cindex.Cursor,
     message: str,
-    cfg_node_id: str | None = None
+    cfg_node_id: str | None = None,
+    reasoning: list[str] | None = None,
 ) -> Diagnostic:
-    """Construct a Pydantic Diagnostic object from a Cursor."""
+    """Construct a Pydantic Diagnostic object from a Cursor.
+
+    `reasoning` is an optional list of plain-text bullets from the AST/CFG
+    detector explaining the decision chain (e.g. "p assigned NULL at L10",
+    "dereferenced at L12"). Rendered in the UI above the LLVM IR evidence.
+    """
     ext = cursor.extent
     # Fallback to cursor location if extent is invalid
     start_line = ext.start.line if ext and ext.start.line else cursor.location.line or 1
     start_col = ext.start.column if ext and ext.start.column else cursor.location.column or 1
     end_line = ext.end.line if ext and ext.end.line else start_line
     end_col = ext.end.column if ext and ext.end.column else start_col
-    
+
     return Diagnostic(
         id=uuid.uuid4().hex,
         category=category,
@@ -91,5 +97,6 @@ def mk_diag(
             end_column=end_col
         ),
         message=message,
-        cfg_node_id=cfg_node_id
+        cfg_node_id=cfg_node_id,
+        reasoning=reasoning,
     )

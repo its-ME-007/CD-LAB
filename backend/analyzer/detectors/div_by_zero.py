@@ -104,10 +104,17 @@ def detect(
                     if op not in ("/", "%"):
                         continue
 
+                    op_line = sub_c.location.line or 0
+
                     # Case 1: literal zero divisor
                     if _is_zero_constant(rhs):
+                        reasoning = [
+                            f"Right-hand operand of '{op}' is the integer literal 0",
+                            f"No guard condition prevents the division at line {op_line}",
+                        ]
                         diags.append(mk_diag("div_zero", "error", sub_c,
-                                             f"Division by literal zero ('{op}')", bid))
+                                             f"Division by literal zero ('{op}')", bid,
+                                             reasoning=reasoning))
                         continue
 
                     # Case 2: variable divisor — check if always/possibly zero
@@ -117,12 +124,28 @@ def detect(
                         if var_defs:
                             zero_defs = {d for d in var_defs
                                          if (d.var, d.block_id, d.stmt_index, d.line) in zero_definitions}
+                            zero_lines = sorted({d.line for d in zero_defs if d.line})
                             if len(zero_defs) == len(var_defs):
+                                reasoning = [
+                                    (f"All reaching definitions of '{var}' assign 0 "
+                                     f"(lines {zero_lines})" if zero_lines
+                                     else f"All reaching definitions of '{var}' assign 0"),
+                                    f"Used as divisor of '{op}' at line {op_line}",
+                                ]
                                 diags.append(mk_diag("div_zero", "error", sub_c,
-                                                     f"Division by zero: '{var}' is always 0", bid))
+                                                     f"Division by zero: '{var}' is always 0", bid,
+                                                     reasoning=reasoning))
                             elif zero_defs:
+                                reasoning = [
+                                    (f"Some reaching definitions of '{var}' assign 0 "
+                                     f"(lines {zero_lines})" if zero_lines
+                                     else f"Some reaching definitions of '{var}' assign 0"),
+                                    f"Zero divisor not ruled out on all paths",
+                                    f"Used as divisor of '{op}' at line {op_line}",
+                                ]
                                 diags.append(mk_diag("div_zero", "warning", sub_c,
-                                                     f"Division by zero: '{var}' may be 0", bid))
+                                                     f"Division by zero: '{var}' may be 0", bid,
+                                                     reasoning=reasoning))
 
             stmt_defs, _ = extract_def_use(stmt)
             line = stmt.location.line or 0

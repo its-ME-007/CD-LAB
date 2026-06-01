@@ -17,7 +17,7 @@ def detect(
     diags: list[Diagnostic] = []
     
     # 1. Walk the function body to find all local constant arrays and record their sizes
-    constant_arrays = {}  # var_name -> size
+    constant_arrays = {}  # var_name -> (size, decl_line)
     for sub_c in walk_cursor(cfg.cursor):
         if sub_c.kind.name == "VAR_DECL":
             t = sub_c.type
@@ -28,7 +28,7 @@ def detect(
                     try:
                         size = t.get_array_size()
                         if size > 0 and sub_c.spelling:
-                            constant_arrays[sub_c.spelling] = size
+                            constant_arrays[sub_c.spelling] = (size, sub_c.location.line or 0)
                     except Exception:
                         pass
 
@@ -41,12 +41,13 @@ def detect(
                 base_var = _lvalue_name(base)
                 
                 if base_var and base_var in constant_arrays:
-                    size = constant_arrays[base_var]
-                    
+                    size, decl_line = constant_arrays[base_var]
+                    access_line = sub_c.location.line or 0
+
                     # Check if index is an integer literal
                     val = None
                     is_negative = False
-                    
+
                     if index.kind.name == "INTEGER_LITERAL":
                         try:
                             tokens = list(index.get_tokens())
@@ -64,26 +65,38 @@ def detect(
                             operand_children = list(index.get_children())
                             if operand_children and operand_children[0].kind.name == "INTEGER_LITERAL":
                                 is_negative = True
-                                
+
                     if is_negative:
+                        reasoning = [
+                            f"Array '{base_var}' declared with size {size} at line {decl_line}",
+                            f"Negative constant index used at line {access_line}",
+                            f"Valid index range is [0, {size})",
+                        ]
                         diags.append(
                             mk_diag(
                                 category="oob",
                                 severity="error",
                                 cursor=sub_c,
                                 message=f"Out of bounds: negative index used on array '{base_var}' (size {size})",
-                                cfg_node_id=None
+                                cfg_node_id=None,
+                                reasoning=reasoning,
                             )
                         )
                     elif val is not None:
                         if val < 0 or val >= size:
+                            reasoning = [
+                                f"Array '{base_var}' declared with size {size} at line {decl_line}",
+                                f"Constant index {val} used at line {access_line}",
+                                f"Valid index range is [0, {size})",
+                            ]
                             diags.append(
                                 mk_diag(
                                     category="oob",
                                     severity="error",
                                     cursor=sub_c,
                                     message=f"Out of bounds: index {val} is out of bounds for array '{base_var}' (size {size})",
-                                    cfg_node_id=None
+                                    cfg_node_id=None,
+                                    reasoning=reasoning,
                                 )
                             )
                             

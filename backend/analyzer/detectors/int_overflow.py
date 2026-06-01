@@ -90,13 +90,20 @@ def detect(
                                 
                         if res is not None:
                             if res < INT_MIN or res > INT_MAX:
+                                op_line = sub_c.location.line or 0
+                                reasoning = [
+                                    f"Both operands of '{op}' are integer literals: {val1} and {val2}",
+                                    f"Computed result {res} is outside the signed int range [{INT_MIN}, {INT_MAX}]",
+                                    f"Operation at line {op_line}",
+                                ]
                                 diags.append(
                                     mk_diag(
                                         category="int_overflow",
                                         severity="error",
                                         cursor=sub_c,
                                         message=f"Signed integer overflow: {val1} {op} {val2} results in {res}, which is outside of [INT_MIN, INT_MAX]",
-                                        cfg_node_id=None
+                                        cfg_node_id=None,
+                                        reasoning=reasoning,
                                     )
                                 )
                                 
